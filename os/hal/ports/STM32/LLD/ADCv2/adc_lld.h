@@ -140,6 +140,15 @@
  * @details If set to @p TRUE the support for ADC1 is included.
  * @note    The default is @p TRUE.
  */
+#if !defined(STM32_ADC_DUAL_MODE) || defined(__DOXYGEN__)
+#define STM32_ADC_DUAL_MODE                 FALSE
+#endif
+
+/**
+ * @brief   ADC1 driver enable switch.
+ * @details If set to @p TRUE the support for ADC1 is included.
+ * @note    The default is @p TRUE.
+ */
 #if !defined(STM32_ADC_USE_ADC1) || defined(__DOXYGEN__)
 #define STM32_ADC_USE_ADC1                  FALSE
 #endif
@@ -459,7 +468,17 @@ struct ADCDriver {
   /**
    * @brief Pointer to the ADCx registers block.
    */
-  ADC_TypeDef               *adc;
+  ADC_TypeDef               *adcm;
+#if STM32_ADC_DUAL_MODE || defined(__DOXYGEN__)
+  /**
+   * @brief   Pointer to the slave ADCx registers block.
+   */
+  ADC_TypeDef               *adcs;
+#endif /* STM32_ADC_DUAL_MODE */
+  /**
+   * @brief   Pointer to the common ADCx_y registers block.
+   */
+  ADC_Common_TypeDef        *adcc;
   /**
    * @brief Pointer to associated DMA channel.
    */
