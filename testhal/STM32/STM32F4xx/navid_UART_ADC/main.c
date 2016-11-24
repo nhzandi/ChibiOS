@@ -16,10 +16,12 @@
 
 #include "ch.h"
 #include "hal.h"
+#include "chprintf.h"
+#include "memstreams.h"
 
-#define ADC_GRP1_NUM_CHANNELS   1
+#define ADC_GRP1_NUM_CHANNELS   2
 // #define ADC_GRP1_BUF_DEPTH      8400
-#define ADC_GRP1_BUF_DEPTH      2100
+#define ADC_GRP1_BUF_DEPTH      1050
 
 static adcsample_t samples1[ADC_GRP1_NUM_CHANNELS * ADC_GRP1_BUF_DEPTH];
 
@@ -37,8 +39,8 @@ static void adcerrorcallback(ADCDriver *adcp, adcerror_t err) {
 /*
  * ADC conversion group.
  * Mode:        Linear buffer, 8 samples of 1 channel, SW triggered.
- * Channels:    IN9 --> PB.1 --> ADC12.
- *              IN8 --> PB.0 --> ADC12.
+ * Channels:    IN12 --> PC.2 --> ADC123.
+ *              IN13 --> PC.3 --> ADC123.
  */
 
 static const ADCConversionGroup adcgrpcfg1 = {
@@ -48,11 +50,11 @@ static const ADCConversionGroup adcgrpcfg1 = {
   adcerrorcallback,
   0,                        /* CR1 */  /*bits25:24--> 00: 12bit, 01: 10bit, 10: 8bit, 11: 6bit*/ /*ADC_CR1_RES_1, ADC_CR1_RES_0, ADC_CR1_RES*/
   ADC_CR2_SWSTART,          /* CR2 */
+  ADC_SMPR1_SMP_AN12(ADC_SAMPLE_28) | ADC_SMPR1_SMP_AN13(ADC_SAMPLE_28) ,  /* SMPR1 */
   0,
-  ADC_SMPR2_SMP_AN9(ADC_SAMPLE_28),  /* SMPR2 */
   ADC_SQR1_NUM_CH(ADC_GRP1_NUM_CHANNELS),
   0,                        /* SQR2 */
-  ADC_SQR3_SQ1_N(ADC_CHANNEL_IN9)
+  ADC_SQR3_SQ1_N(ADC_CHANNEL_IN12) | ADC_SQR3_SQ2_N(ADC_CHANNEL_IN13)
 };
 
 static void led3off(void *p) {
@@ -186,8 +188,45 @@ static THD_FUNCTION(Thread1, arg)
      //palSetPad(GPIOE,GPIOD_LED6);
      //chThdSleepMilliseconds(500);
      //palClearPad(GPIOE,GPIOD_LED6);
+    //  chThdSleepMilliseconds(500);
+     extChannelDisable(&EXTD1, 0); //disable
      adcConvert(&ADCD1, &adcgrpcfg1, samples1, ADC_GRP1_BUF_DEPTH);  //ba labe bala ravande yek bar ADC anjam mishavad
-     chThdSleepMilliseconds(500);
+
+     uartStartSend(&UARTD2, 10, "ADCSTART\r\n");
+     chThdSleepMilliseconds(30);
+
+     uartStopSend(&UARTD2);
+
+     int i, x=0;
+     char smpl[7];
+
+     for (i=0 ; i <= (ADC_GRP1_NUM_CHANNELS * ADC_GRP1_BUF_DEPTH)-1; i=i+1){
+       x=chsnprintf(smpl, sizeof(smpl), "%u\r\n", samples1[i]);
+
+       uartStartSend(&UARTD2, x, smpl);
+       chThdSleepMilliseconds(3);
+     }
+
+     uartStopSend(&UARTD2);
+
+     uartStartSend(&UARTD2,9, "ADCSTOP\r\n");
+     chThdSleepMilliseconds(30);
+
+     uartStopSend(&UARTD2);
+
+ /*    if (palReadPad(GPIOA, GPIOA_BUTTON)) {
+       gptStopTimer(&GPTD6);
+       dacStopConversion(&DACD1);
+     }
+ */
+     chThdSleepMilliseconds(3000);
+
+
+
+
+
+    //  chThdSleepMilliseconds(500);
+    extChannelEnable(&EXTD1, 0);  //enable ext interrupt to catch again
 
    }
  }
@@ -260,6 +299,11 @@ int main(void) {
   chSysInit();
 
 
+  /*
+   * Setting up analog inputs used by the demo.
+   */
+  palSetGroupMode(GPIOC, PAL_PORT_BIT(2) | PAL_PORT_BIT(3),
+                  0, PAL_MODE_INPUT_ANALOG);
  /*
    * Creates the blinker thread.
    */
