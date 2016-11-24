@@ -120,8 +120,14 @@ OSAL_IRQ_HANDLER(STM32_ADC_HANDLER) {
 #if STM32_ADC_DUAL_MODE
   sr = ADC1->SR;
   sr |= ADC2->SR;
+#if STM32_ADC_TRIPLE_MODE
+  sr |= ADC3->SR;
+#endif
   ADC1->SR = 0;
   ADC2->SR = 0;
+#if STM32_ADC_TRIPLE_MODE
+  ADC3->SR = 0;
+#endif
   /* Note, an overflow may occur after the conversion ended before the driver
      is able to stop the ADC, this is why the DMA channel is checked too.*/
   if ((sr & ADC_SR_OVR) && (dmaStreamGetTransactionSize(ADCD1.dmastp) > 0)) {
@@ -197,6 +203,9 @@ void adc_lld_init(void) {
   ADCD1.adcc = ADC;
 #if STM32_ADC_DUAL_MODE
   ADCD1.adcs = ADC2;
+#if STM32_ADC_TRIPLE_MODE
+  ADCD1.adcs2 = ADC3;
+#endif
 #endif
   ADCD1.dmastp  = STM32_DMA_STREAM(STM32_ADC_ADC1_DMA_STREAM);
   ADCD1.dmamode = STM32_DMA_CR_CHSEL(ADC1_DMA_CHANNEL) |
@@ -293,6 +302,9 @@ void adc_lld_start(ADCDriver *adcp) {
   /* Setting DMA peripheral-side pointer.*/
 #if STM32_ADC_DUAL_MODE
   rccEnableADC2(FALSE);
+#if STM32_ADC_TRIPLE_MODE
+  rccEnableADC3(FALSE);
+#endif
   // dmaStreamSetPeripheral(adcp->dmastp, &adcp->adcc->CDR);
   dmaStreamSetPeripheral(adcp->dmastp, &adcp->adcc->CDR);
 #else
@@ -305,6 +317,11 @@ void adc_lld_start(ADCDriver *adcp) {
     ADC->CCR = (ADC->CCR & (ADC_CCR_TSVREFE | ADC_CCR_VBATE)) |
                (STM32_ADC_ADCPRE << 16) |
                 ADC_CCR_MULTI_0 | ADC_CCR_MULTI_1 | ADC_CCR_MULTI_2 |
+                ADC_CCR_DMA_1 | ADC_CCR_DDS;
+#elif STM32_ADC_TRIPLE_MODE
+    ADC->CCR = (ADC->CCR & (ADC_CCR_TSVREFE | ADC_CCR_VBATE)) |
+               (STM32_ADC_ADCPRE << 16) |
+                ADC_CCR_MULTI_0 | ADC_CCR_MULTI_1 | ADC_CCR_MULTI_2 | ADC_CCR_MULTI_4
                 ADC_CCR_DMA_1 | ADC_CCR_DDS;
 #else
     ADC->CCR = (ADC->CCR & (ADC_CCR_TSVREFE | ADC_CCR_VBATE)) |
@@ -319,9 +336,15 @@ void adc_lld_start(ADCDriver *adcp) {
 
     adcp->adcs->CR1 = 0;
     adcp->adcs->CR2 = 0;
-
+#if STM32_ADC_TRIPLE_MODE
+    adcp->adcs2->CR1 = 0;
+    adcp->adcs2->CR2 = 0;
+#endif
     adcp->adcm->CR2 = ADC_CR2_ADON;
     adcp->adcs->CR2 = ADC_CR2_ADON;
+#if STM32_ADC_TRIPLE_MODE
+    adcp->adcs2->CR2 = ADC_CR2_ADON;
+#endif
 #else
     adcp->adcm->CR1 = 0;
     adcp->adcm->CR2 = 0;
@@ -346,8 +369,12 @@ void adc_lld_stop(ADCDriver *adcp) {
     adcp->adcm->CR2 = 0;
 
 #if STM32_ADC_DUAL_MODE
-    adcp->adcm->CR1 = 0;
-    adcp->adcm->CR2 = 0;
+    adcp->adcs->CR1 = 0;
+    adcp->adcs->CR2 = 0;
+#if STM32_ADC_TRIPLE_MODE
+    adcp->adcs2->CR1 = 0;
+    adcp->adcs2->CR2 = 0;
+#endif
 #endif
 
 #if STM32_ADC_USE_ADC1
@@ -356,6 +383,10 @@ void adc_lld_stop(ADCDriver *adcp) {
 #if STM32_ADC_DUAL_MODE
     if(&ADCD1 == adcp)
       rccDisableADC2(FALSE);
+#if STM32_ADC_TRIPLE_MODE
+    if(&ADCD1 == adcp)
+      rccDisableADC3(FALSE);
+#endif
 #endif /*!STM32_ADC_DUAL_MODE*/
 #endif /*!STM32_ADC_USE_ADC1*/
 
@@ -386,6 +417,7 @@ void adc_lld_start_conversion(ADCDriver *adcp) {
   uint32_t cr2;
   const ADCConversionGroup *grpp = adcp->grpp;
 
+  //TODO: check if it works in dual mode with 1 channel
   osalDbgAssert(!STM32_ADC_DUAL_MODE || ((grpp->num_channels & 1) == 0),
                 "odd number of channels in dual mode");
   /* DMA setup.*/
@@ -423,10 +455,21 @@ void adc_lld_start_conversion(ADCDriver *adcp) {
   adcp->adcs->SQR1  = grpp->sqr1;
   adcp->adcs->SQR2  = grpp->sqr2;
   adcp->adcs->SQR3  = grpp->sqr3;
+#if STM32_ADC_TRIPLE_MODE
+  adcp->adcs2->SR    = 0;
+  adcp->adcs2->SMPR1 = grpp->smpr1;
+  adcp->adcs2->SMPR2 = grpp->smpr2;
+  adcp->adcs2->SQR1  = grpp->sqr1;
+  adcp->adcs2->SQR2  = grpp->sqr2;
+  adcp->adcs2->SQR3  = grpp->sqr3;
+#endif
 
   /* ADC configuration and start.*/
   adcp->adcm->CR1   = grpp->cr1 | ADC_CR1_OVRIE | ADC_CR1_SCAN;
   adcp->adcs->CR1   = grpp->cr1 | ADC_CR1_OVRIE | ADC_CR1_SCAN;
+#if STM32_ADC_TRIPLE_MODE
+  adcp->adcs2->CR1  = grpp->cr1 | ADC_CR1_OVRIE | ADC_CR1_SCAN;
+#endif
 
   /* Enforcing the mandatory bits in CR2.*/
   cr2 = grpp->cr2 | ADC_CR2_DMA | ADC_CR2_DDS | ADC_CR2_ADON;
@@ -437,14 +480,23 @@ void adc_lld_start_conversion(ADCDriver *adcp) {
     /* Initializing CR2 while keeping ADC_CR2_SWSTART at zero.*/
     adcp->adcm->CR2 = (cr2 | ADC_CR2_CONT) & ~ADC_CR2_SWSTART;
     adcp->adcs->CR2 = (cr2 | ADC_CR2_CONT) & ~ADC_CR2_SWSTART;
+#if STM32_ADC_TRIPLE_MODE
+    adcp->adcs2->CR2 = (cr2 | ADC_CR2_CONT) & ~ADC_CR2_SWSTART;
+#endif
 
     /* Finally enabling ADC_CR2_SWSTART.*/
     adcp->adcm->CR2 = (cr2 | ADC_CR2_CONT);
     adcp->adcs->CR2 = (cr2 | ADC_CR2_CONT);
+#if STM32_ADC_TRIPLE_MODE
+    adcp->adcs2->CR2 = (cr2 | ADC_CR2_CONT);
+#endif
   }
   else{
     adcp->adcm->CR2 = cr2;
     adcp->adcs->CR2 = cr2;
+#if STM32_ADC_TRIPLE_MODE
+    adcp->adcs2->CR2 = cr2;
+#endif
   }
 #else /* !STM32_ADC_DUAL_MODE */
   adcp->adcm->SR    = 0;
@@ -491,6 +543,11 @@ void adc_lld_stop_conversion(ADCDriver *adcp) {
   adcp->adcs->CR1 = 0;
   adcp->adcs->CR2 = 0;
   adcp->adcs->CR2 = ADC_CR2_ADON;
+#if STM32_ADC_TRIPLE_MODE
+  adcp->adcs2->CR1 = 0;
+  adcp->adcs2->CR2 = 0;
+  adcp->adcs2->CR2 = ADC_CR2_ADON;
+#endif
 #endif
 
 }

@@ -136,12 +136,21 @@
 #endif
 
 /**
- * @brief   ADC1 driver enable switch.
- * @details If set to @p TRUE the support for ADC1 is included.
- * @note    The default is @p TRUE.
+ * @brief   ADC driver dual mode enable switch.
+ * @details If set to @p TRUE the support for dual mode ADC is included.
+ * @note    The default is @p FALSE.
  */
 #if !defined(STM32_ADC_DUAL_MODE) || defined(__DOXYGEN__)
 #define STM32_ADC_DUAL_MODE                 FALSE
+#endif
+
+/**
+ * @brief   ADC driver triple mode enable switch.
+ * @details If set to @p TRUE the support for triple mode ADC is included.
+ * @note    The default is @p FALSE.
+ */
+#if !defined(STM32_ADC_TRIPLE_MODE) || defined(__DOXYGEN__)
+#define STM32_ADC_TRIPLE_MODE                 FALSE
 #endif
 
 /**
@@ -474,6 +483,12 @@ struct ADCDriver {
    * @brief   Pointer to the slave ADCx registers block.
    */
   ADC_TypeDef               *adcs;
+#if STM32_ADC_TRIPLE_MODE || defined(__DOXYGEN__)
+  /**
+   * @brief   Pointer to the slave number 2, ADCx registers block.
+   */
+  ADC_TypeDef               *adcs2;
+#endif
 #endif /* STM32_ADC_DUAL_MODE */
   /**
    * @brief   Pointer to the common ADCx_y registers block.
