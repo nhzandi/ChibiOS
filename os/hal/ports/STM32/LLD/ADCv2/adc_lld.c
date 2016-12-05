@@ -419,8 +419,8 @@ void adc_lld_start_conversion(ADCDriver *adcp) {
   const ADCConversionGroup *grpp = adcp->grpp;
 
   //TODO: check if it works in dual mode with 1 channel
-  osalDbgAssert(!STM32_ADC_DUAL_MODE || ((grpp->num_channels & 1) == 0),
-                "odd number of channels in dual mode");
+  // osalDbgAssert(!STM32_ADC_DUAL_MODE || ((grpp->num_channels & 1) == 0),
+  //               "odd number of channels in dual mode");
   /* DMA setup.*/
   mode = adcp->dmamode;
   if (grpp->circular) {
