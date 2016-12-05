@@ -318,11 +318,12 @@ void adc_lld_start(ADCDriver *adcp) {
                (STM32_ADC_ADCPRE << 16) |
                 ADC_CCR_MULTI_0 | ADC_CCR_MULTI_1 | ADC_CCR_MULTI_2 |
                 ADC_CCR_DMA_1 | ADC_CCR_DDS;
-#elif STM32_ADC_TRIPLE_MODE
+#if STM32_ADC_TRIPLE_MODE
     ADC->CCR = (ADC->CCR & (ADC_CCR_TSVREFE | ADC_CCR_VBATE)) |
                (STM32_ADC_ADCPRE << 16) |
-                ADC_CCR_MULTI_0 | ADC_CCR_MULTI_1 | ADC_CCR_MULTI_2 | ADC_CCR_MULTI_4
+                ADC_CCR_MULTI_0 | ADC_CCR_MULTI_1 | ADC_CCR_MULTI_2 | ADC_CCR_MULTI_4 |
                 ADC_CCR_DMA_1 | ADC_CCR_DDS;
+#endif
 #else
     ADC->CCR = (ADC->CCR & (ADC_CCR_TSVREFE | ADC_CCR_VBATE)) |
                (STM32_ADC_ADCPRE << 16);
